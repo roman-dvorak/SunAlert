@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block content %}
+<script type="text/javascript">var liveplot = null;</script>
+
+<div class="card">
+		<div class="card-header">
+			X-ray flux
+		</div>
+
+		<div class="card-body">
+			<div class="row">
+				<div class="col-9">
+					<div id="myDiv"></div>
+
+				</div>
+
+				<div class="col-3">
+					<input type="log" id="alarm_limit" onchange="update_alert_limit()">
+					<select>
+						<option>Never</option>
+						<option>0.5 min</option>
+						<option>1 min</option>
+						<option>2 min</option>
+						<option>5 min</option>
+						<option>10 min</option>
+						<option>15 min</option>
+					</select>
+				</div>
+			</div>
+		</div>
+</div>
+
+
+<script type="text/javascript">
+
+function update_alert_limit(){
+	var val = $("#alarm_limit").val();
+	console.log(val);
+}
+	
+
+function makeplot() {
+  Plotly.d3.csv("/live/data.json", function(data){ processData(data) } );
+};
+
+function processData(allRows) {
+
+  //console.log(allRows);
+  var x = [], y = [], y2 = [], standard_deviation = [], row = {};
+  console.log(allRows[0]);
+
+  for (var i=0; i < allRows.length; i++) {
+    try{
+	    x.push( allRows[i]['time_tag'] );
+    	y.push( allRows[i].x_long );
+    	y2.push( allRows[i].x_short );
+    }catch(e){
+    	//console.log(e);
+    }
+  }
+  makePlotly(x, y, y2);
+}
+
+function makePlotly( x, y, y2 ){
+  var traces = [{
+    x: x,
+    y: y,
+  },{
+    x: x,
+    y: y2,
+  }];
+
+  var layout = {
+	yaxis: {
+		type: 'log',
+		showexponent: 'all',
+		exponentformat: 'e',
+		range: [10^-3, 10^-9],
+		title: 'Intensity [W*m-2]'
+	},
+	xaxis:{
+		range: [Date.UTC() - (24 * 3600 * 1000), Date.UTC()],
+		title: ''
+	},
+	annotations: [
+		{
+			text: 'X',
+            xref: 'paper',
+            yref: 'y',
+            x: 0.5,
+            y: 0.0001,
+            ax: 0,
+            ay: 0,
+            showarrow: false,
+            //fillcolor: '#ff0000',
+		},
+		{
+			text: 'M',
+            xref: 'paper',
+            //yref: 'paper',
+            x: 0.5,
+            y: 0.0001,
+            ax: -1,
+            ay: -1,
+            showarrow: false,
+            //fillcolor: '#ff0000',
+		}
+	],
+	shapes: [
+        {// X
+            type: 'rect',
+            xref: 'paper',
+            yref: 'y',
+            x0: 0,
+            x1: 1,
+            y0: 0.001,
+            y1: 0.0001,
+            fillcolor: '#ff0000',
+            opacity: 0.2,
+            line: {
+                width: 0
+            }
+        },
+        {// M
+            type: 'rect',
+            xref: 'paper',
+            yref: 'y',
+            x0: 0,
+            x1: 1,
+            y0: 0.0001,
+            y1: 0.00001,
+            fillcolor: '#ff9933',
+            opacity: 0.2,
+            line: {
+                width: 0
+            }
+        },
+        { // C
+            type: 'rect',
+            xref: 'paper',
+            yref: 'y',
+            x0: 0,
+            x1: 1,
+            y0: 0.00001,
+            y1: 0.000001,
+            fillcolor: '#ffff00',
+            opacity: 0.2,
+            line: {
+                width: 0
+            }
+        },
+        { // B
+            type: 'rect',
+            xref: 'paper',
+            yref: 'y',
+            x0: 0,
+            x1: 1,
+            y0: 0.000001,
+            y1: 0.0000001,
+            fillcolor: '#00cc00',
+            opacity: 0.2,
+            line: {
+                width: 0
+            }
+        }
+    ],
+	title:'X-ray flux'
+  };
+
+  liveplot = Plotly.newPlot('myDiv', traces, layout);
+};
+ 
+ makeplot();
+
+
+
+</script>
+
+
+{% endblock %}
+
