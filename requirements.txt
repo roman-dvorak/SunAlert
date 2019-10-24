@@ -6,3 +6,4 @@ sunpy
 pandas
 flask
 sqlalchemy
+authomatic

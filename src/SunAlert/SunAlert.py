@@ -4,6 +4,7 @@ from flask import request
 from flask import render_template
 from flask import redirect
 from flask import url_for
+from flask import session
 from flask import jsonify
 from flask_security import Security, SQLAlchemyUserDatastore, \
     UserMixin, RoleMixin, login_required
@@ -35,34 +36,15 @@ from bokeh.embed import file_html
 from bokeh.resources import CDN
 from sunpy.database import Database
 
+from sunpy.instr.goes import flux_to_flareclass
+import astropy.units as u
 
+from flask import Flask, render_template, request, make_response
+from authomatic.adapters import WerkzeugAdapter
+from authomatic import Authomatic
 
-import io
-import base64
+from config import CONFIG
 
-import mpld3
-from mpld3 import plugins
-
-from bokeh.plotting import figure, show, output_file    
-from bokeh.layouts import gridplot
-from bokeh.plotting import figure, show, output_file
-from bokeh.models import Span
-from bokeh.embed import components
-
-class printer():
-    def __init__(self, name, url, api_key):
-        self.name = name
-        self.url = url
-        self.api_key = api_key
-
-    def get_version(self):
-        headers = {
-            'Content-Type': 'application/json',
-            'X-Api-Key': self.api_key
-            }
-        print("ZJISTI STAV!", self.url+"/api/version")
-        response = requests.get(self.url+"/api/version", headers=headers)
-        return(str(response.content))
 
 
 database = Database('sqlite:///sunpydata.sqlite')
@@ -75,6 +57,7 @@ class Server():
         self.printer_class = {}
 
         self.db = pymongo.MongoClient('localhost', 27017)['SunAlert']
+        self.authomatic = Authomatic(CONFIG, 'your secret string', report_errors=False)
 
         self.app = Flask('SunAlert')
         self.start()
@@ -92,8 +75,10 @@ class Server():
         self.app.add_url_rule('/live', 'live', self.live)
         self.app.add_url_rule('/live/data.csv', 'live_data', self.graph_sp)
         self.app.add_url_rule('/live/data.json', 'live_data_json', self.graph_json)
+        self.app.add_url_rule('/live/state.json', 'state_json', self.current_state)
         self.app.add_url_rule('/printers', 'printers', self.get_printers)
         self.app.add_url_rule('/printer/<id>/', 'printer', self.printer)
+        self.app.add_url_rule('/login/<provider_name>/', 'login', self.login)
 
     def live(self):
         return render_template('live.html', title = "Live")
@@ -123,9 +108,28 @@ class Server():
 
     def graph_json(self):
         data = pd.read_json("https://services.swpc.noaa.gov/json/goes/15/goes15_xray_1m.json")
+        #data = pd.read_json("https://services.swpc.noaa.gov/json/goes/primary/xrays-1-day.json")
         return data.to_csv()
 
+    def current_state(self):
+        data = pd.read_json("https://services.swpc.noaa.gov/json/goes/15/goes15_xray_1m.json")
+        
+        last = data.iloc[0]['x_long']
+        text_last = flux_to_flareclass(last* u.watt/u.m**2)
 
+        max_24 = data['x_long'].max()
+        text_max_24 = flux_to_flareclass(max_24*u.watt/u.m**2)
+
+        out = {
+            'last': last,
+            'last_text': text_last,
+            'max_24': max_24,
+            'max_24_text': text_max_24,
+        }
+        print(" ")
+        print(out)
+
+        return jsonify(out)
 
 
     def index(self):
@@ -149,6 +153,26 @@ class Server():
         p = self.pf.get_printer(id, update = True)
         print(p['name'])
         return(bson.json_util.dumps(p))
+
+    def login(self, provider_name):
+
+        # We need response object for the WerkzeugAdapter.
+        response = make_response()
+        
+        # Log the user in, pass it the adapter and the provider name.
+        result = self.authomatic.login(WerkzeugAdapter(request, response), provider_name)
+        
+        # If there is no LoginResult object, the login procedure is still pending.
+        if result:
+            if result.user:
+                # We need to update the user to get more info.
+                result.user.update()
+            
+            # The rest happens inside the template.
+            return render_template('login.html', result=result)
+        
+        # Don't forget to return the response.
+        return response
 
 if __name__ == '__main__':
     s = Server()

@@ -2,6 +2,66 @@
 
 {% block content %}
 <script type="text/javascript">var liveplot = null;</script>
+<script type="text/javascript">
+	var shapes_classes = [
+		{// X
+            type: 'rect',
+            xref: 'paper',
+            yref: 'y',
+            x0: 0,
+            x1: 1,
+            y0: 0.001,
+            y1: 0.0001,
+            fillcolor: '#ff0000',
+            opacity: 0.2,
+            line: {
+                width: 0
+            }
+        },
+        {// M
+            type: 'rect',
+            xref: 'paper',
+            yref: 'y',
+            x0: 0,
+            x1: 1,
+            y0: 0.0001,
+            y1: 0.00001,
+            fillcolor: '#ff9933',
+            opacity: 0.2,
+            line: {
+                width: 0
+            }
+        },
+        { // C
+            type: 'rect',
+            xref: 'paper',
+            yref: 'y',
+            x0: 0,
+            x1: 1,
+            y0: 0.00001,
+            y1: 0.000001,
+            fillcolor: '#ffff00',
+            opacity: 0.2,
+            line: {
+                width: 0
+            }
+        },
+        { // B
+            type: 'rect',
+            xref: 'paper',
+            yref: 'y',
+            x0: 0,
+            x1: 1,
+            y0: 0.000001,
+            y1: 0.0000001,
+            fillcolor: '#00cc00',
+            opacity: 0.2,
+            line: {
+                width: 0
+            }
+        }
+    ];
+</script>
 
 <div class="card">
 		<div class="card-header">
@@ -17,15 +77,33 @@
 
 				<div class="col-3">
 					<input type="log" id="alarm_limit" onchange="update_alert_limit()">
-					<select>
-						<option>Never</option>
-						<option>0.5 min</option>
-						<option>1 min</option>
-						<option>2 min</option>
-						<option>5 min</option>
-						<option>10 min</option>
-						<option>15 min</option>
+					<select onchange="update_update_period()" id="update_period">
+						<option value="0">Never</option>
+						<option value="3">0.05 min</option>
+						<option value="30">0.5 min</option>
+						<option value="60">1 min</option>
+						<option value="120">2 min</option>
+						<option value="300">5 min</option>
+						<option value="600">10 min</option>
+						<option value="900">15 min</option>
 					</select>
+
+					<div>
+						
+						<div class="card mt-1 ml-1 val-state data-current" style="max-width: 18rem;">
+							<div class="card-header">Current</div>
+							<div class="card-body value-text">---
+							</div>
+						</div>
+
+						<div class="card mt-1 ml-1 val-state data-max-24" style="max-width: 18rem;">
+							<div class="card-header">Max 24h</div>
+							<div class="card-body value-text">---
+							</div>
+						</div>
+
+
+					</div>
 				</div>
 			</div>
 		</div>
@@ -33,10 +111,62 @@
 
 
 <script type="text/javascript">
+var interval;
+
+function update_data(){
+	fetch_current_state();
+	makeplot();
+}
+
+function update_update_period(){
+	clearInterval(interval);
+	if($("#update_period").val() > 0){
+		update_data();
+		interval = setInterval(function(){update_data();}, $("#update_period").val()*1000);
+	}
+}
+
+function update_current_state(data){
+	$(".data-current .value-text").text(data.last_text);
+	$(".data-max-24 .value-text").text(data.max_24_text);
+}
+
+function fetch_current_state(){
+	$.ajax({
+        type: "GET",
+        contentType: "application/json; charset=utf-8",
+        url: "/live/state.json",
+        success: function( data, textStatus, jQxhr ){
+			console.log(data);
+			update_current_state(data);
+        },
+        error: function( jqXhr, textStatus, errorThrown ){
+            console.log( errorThrown );
+        }
+    });
+}
+
+fetch_current_state();
 
 function update_alert_limit(){
 	var val = $("#alarm_limit").val();
 	console.log(val);
+	Plotly.update("myDiv", {}, {
+		shapes: [].concat(shapes_classes, [
+			{
+			    type: "line",
+            	xref: 'paper',
+	            x0: 0,
+	            y0: val,
+	            x1: 1,
+	            y1: val,
+	            line: {
+	                color:"red",
+	                width:2,
+    	        }
+    	    }
+		])
+	});
 }
 	
 
@@ -107,64 +237,7 @@ function makePlotly( x, y, y2 ){
             //fillcolor: '#ff0000',
 		}
 	],
-	shapes: [
-        {// X
-            type: 'rect',
-            xref: 'paper',
-            yref: 'y',
-            x0: 0,
-            x1: 1,
-            y0: 0.001,
-            y1: 0.0001,
-            fillcolor: '#ff0000',
-            opacity: 0.2,
-            line: {
-                width: 0
-            }
-        },
-        {// M
-            type: 'rect',
-            xref: 'paper',
-            yref: 'y',
-            x0: 0,
-            x1: 1,
-            y0: 0.0001,
-            y1: 0.00001,
-            fillcolor: '#ff9933',
-            opacity: 0.2,
-            line: {
-                width: 0
-            }
-        },
-        { // C
-            type: 'rect',
-            xref: 'paper',
-            yref: 'y',
-            x0: 0,
-            x1: 1,
-            y0: 0.00001,
-            y1: 0.000001,
-            fillcolor: '#ffff00',
-            opacity: 0.2,
-            line: {
-                width: 0
-            }
-        },
-        { // B
-            type: 'rect',
-            xref: 'paper',
-            yref: 'y',
-            x0: 0,
-            x1: 1,
-            y0: 0.000001,
-            y1: 0.0000001,
-            fillcolor: '#00cc00',
-            opacity: 0.2,
-            line: {
-                width: 0
-            }
-        }
-    ],
+	shapes: [].concat(shapes_classes),
 	title:'X-ray flux'
   };
 
